@@ -179,6 +179,13 @@ function compressProse(text) {
   const protected_items = [];
   let protectedText = text;
 
+  // Protect ponytail: comments across languages
+  protectedText = protectedText.replace(/(?:\/\/\/|(?:\/\/|#|\/\*|--|<!--)\s*ponytail:\s*.+?(?:\s*\*\/|\s*-->)?)/gi, (match) => {
+    const idx = protected_items.length;
+    protected_items.push(match);
+    return `\x00PROT${idx}\x00`;
+  });
+
   // Protect A* (e.g. A* search)
   protectedText = protectedText.replace(/\bA\*(?!\w)/g, (match) => {
     const idx = protected_items.length;

@@ -72,6 +72,11 @@ describe('TITAN Compress', () => {
       const result = compressProse('We use A* search for pathfinding.');
       assert.ok(result.includes('A* search'));
     });
+
+    it('should preserve ponytail: comments inside prose verbatim', () => {
+      const result = compressProse('This is a very simple database setup. <!-- ponytail: sqlite, use PG later -->');
+      assert.ok(result.includes('<!-- ponytail: sqlite, use PG later -->'));
+    });
   });
 
   describe('compress (full pipeline)', () => {

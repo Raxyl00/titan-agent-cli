@@ -7,7 +7,7 @@ This file contains the complete codebase of the TITAN project.
 ```json
 {
   "name": "titan-agent-cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Unified token compression framework for LLM agents. Three orthogonal layers: Linguistic (L1), Structural (L2), Contextual (L3). Universal compatibility across 9+ AI coding agents.",
   "main": "src/cli.js",
   "bin": {
@@ -977,6 +977,13 @@ function compressProse(text) {
   // Extract and protect inline code, URLs, and file paths
   const protected_items = [];
   let protectedText = text;
+
+  // Protect ponytail: comments across languages
+  protectedText = protectedText.replace(/(?:\/\/\/|(?:\/\/|#|\/\*|--|<!--)\s*ponytail:\s*.+?(?:\s*\*\/|\s*-->)?)/gi, (match) => {
+    const idx = protected_items.length;
+    protected_items.push(match);
+    return `\x00PROT${idx}\x00`;
+  });
 
   // Protect A* (e.g. A* search)
   protectedText = protectedText.replace(/\bA\*(?!\w)/g, (match) => {
@@ -2384,6 +2391,11 @@ describe('TITAN Compress', () => {
     it('should preserve A* search and similar edge cases', () => {
       const result = compressProse('We use A* search for pathfinding.');
       assert.ok(result.includes('A* search'));
+    });
+
+    it('should preserve ponytail: comments inside prose verbatim', () => {
+      const result = compressProse('This is a very simple database setup. <!-- ponytail: sqlite, use PG later -->');
+      assert.ok(result.includes('<!-- ponytail: sqlite, use PG later -->'));
     });
   });
 
