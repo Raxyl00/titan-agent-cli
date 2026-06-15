@@ -189,22 +189,41 @@ TITAN adapts its output format dynamically to match the specific rules and struc
 
 ## 📊 Cognitive Benchmark & UID (Usable Intelligence Density)
 
-To ensure that prompt compression doesn't degrade the agent's reasoning capabilities, TITAN includes a built-in multi-task evaluation framework. Run `titan benchmark` (in mock mode, or with `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` for live tests) to audit three distinct developer skills: **Coding (Product Filter)**, **Debugging (Circular Dependency)**, and **Logic (Surgeon Riddle)**.
+To ensure that prompt compression doesn't degrade the agent's reasoning capabilities, TITAN includes a built-in multi-task evaluation framework. Run the benchmark to audit three distinct developer skills: **Coding (Product Filter)**, **Debugging (Circular Dependency)**, and **Logic (Surgeon Riddle)**.
 
+### How to Run & Reproduce
+The benchmark can be run in mock simulation mode or via actual LLM provider APIs:
+```bash
+# Run in mock mode (using illustrative demonstration values)
+titan benchmark
+
+# Run real empirical tests via API keys (runs 3 times per task, throttled at 500ms sleep)
+ANTHROPIC_API_KEY=sk-... titan benchmark
+# or
+OPENAI_API_KEY=sk-... titan benchmark
+```
+> [!NOTE]
+> Il modello usato è configurabile via `TITAN_BENCH_MODEL`. Il modello di default per Anthropic è `claude-sonnet-4-6`, mentre per OpenAI è `gpt-4o-mini`.
+
+### Evaluation Metrics & UID
 It evaluates the **Usable Intelligence Density (UID)**:
-
 ```
 UID = (Avg Accuracy % / Avg Output Tokens) * 1000
 ```
-
 This represents the reasoning throughput preserved per token of context.
+
+> [!IMPORTANT]
+> ⚠ Dati da mock mode — non empirici (i dati sotto riportati in tabella sono da run reale con API o mock se non disponibile, ed in questo caso sono a scopo illustrativo).
+> I valori di caveman e ponytail servono come baseline di confronto per i componenti upstream integrati in TITAN.
 
 | Variant | Coding Score | Debug Score | Logic Score | Avg Score % | Avg Tokens | UID (Density) | Status |
 |---|---|---|---|---|---|---|---|
-| **Baseline** | 100% | 100% | 100% | 100% | 150 | 666.7 | Reliable |
-| **TITAN Balanced** | 100% | 100% | 100% | 100% | 61 | 1639.3 | Reliable |
-| **TITAN Lite** | 100% | 100% | 100% | 100% | 60 | 1666.7 | Reliable |
-| **TITAN Aggressive** | 100% | 90% | 60% | 83% | 38 | 2184.2 | ⚠️ Degraded |
+| **Baseline** | 100% | 100% | 100% | 100% ±0% | 143 ±0 | 697.7 | Reliable |
+| **Caveman** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
+| **Ponytail** | 100% | 70% | 80% | 83% ±0% | 57 ±0 | 1470.6 | Reliable |
+| **TITAN Balanced** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
+| **TITAN Lite** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
+| **TITAN Aggressive** | 100% | 90% | 60% | 83% ±0% | 38 ±0 | 2173.9 | Reliable |
 
 * **Balanced/Lite**: Maximize token density while retaining a flat 100% cognitive success rate.
 * **Aggressive**: Telegraphic mode. Achieves the highest density (~38 tokens per response), but logic reasoning starts to degrade on complex deduction.

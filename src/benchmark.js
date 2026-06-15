@@ -13,11 +13,54 @@ const TASKS = [
     evaluate: (text) => {
       let score = 0;
       const t = text.toLowerCase();
-      // Check syntax/concepts
-      if (t.includes('filter')) score += 30;
-      if (t.includes('map')) score += 30;
-      if (t.includes('stock') && (t.includes('>') || t.includes('!==') || t.includes('stock)'))) score += 20;
-      if (t.includes('price') && t.includes('stock')) score += 20;
+
+      // 1. filter AND filters stock (+25 pts)
+      const hasFilter = t.includes('filter');
+      const hasStockFilter = /stock\s*===\s*0/.test(t) ||
+                             /stock\s*>\s*0/.test(t) ||
+                             /stock\s*!==\s*0/.test(t) ||
+                             t.includes('!item.stock');
+      if (hasFilter && hasStockFilter) {
+        score += 25;
+      }
+
+      // 2. map used for transformation (+25 pts)
+      const hasMap = t.includes('.map(') ||
+                     t.includes('.map(item') ||
+                     t.includes('.map(p ') ||
+                     /\.map\s*\(/.test(t);
+      if (hasMap) {
+        score += 25;
+      }
+
+      // 3. totalValue OR price & stock within 50 chars (+25 pts)
+      const hasTotalValue = t.includes('totalvalue');
+      const priceStockClose = () => {
+        let idx = 0;
+        while (true) {
+          const pIdx = t.indexOf('price', idx);
+          if (pIdx === -1) break;
+          let sIdx = 0;
+          while (true) {
+            const sIdxNext = t.indexOf('stock', sIdx);
+            if (sIdxNext === -1) break;
+            if (Math.abs(pIdx - sIdxNext) <= 50) return true;
+            sIdx = sIdxNext + 1;
+          }
+          idx = pIdx + 1;
+        }
+        return false;
+      };
+      if (hasTotalValue || priceStockClose()) {
+        score += 25;
+      }
+
+      // 4. arrow function or function declaration (+25 pts)
+      const hasFunction = t.includes('=>') || t.includes('function');
+      if (hasFunction) {
+        score += 25;
+      }
+
       return score;
     }
   },
@@ -28,8 +71,31 @@ const TASKS = [
     evaluate: (text) => {
       let score = 0;
       const t = text.toLowerCase();
-      if (t.includes('circular') || t.includes('cycle') || t.includes('loop')) score += 40;
-      if (t.includes('inject') || t.includes('dependency injection') || t.includes('refactor') || t.includes('pass') || t.includes('require') || t.includes('export')) score += 60;
+
+      // 1. circular OR (dependency AND cycle) (+40 pts)
+      if (t.includes('circular') || (t.includes('dependency') && t.includes('cycle'))) {
+        score += 40;
+      }
+
+      // 2. structural solution (+30 pts)
+      const hasSolution = t.includes('dependency injection') ||
+                          t.includes('invert') ||
+                          t.includes('extract') ||
+                          t.includes('third module') ||
+                          t.includes('shared module');
+      if (hasSolution) {
+        score += 30;
+      }
+
+      // 3. Node.js mechanism (+30 pts)
+      const hasMechanism = t.includes('incomplete object') ||
+                           t.includes('partially loaded') ||
+                           t.includes('module cache') ||
+                           t.includes('require cache');
+      if (hasMechanism) {
+        score += 30;
+      }
+
       return score;
     }
   },
@@ -39,10 +105,12 @@ const TASKS = [
     prompt: 'A father and son are in a car accident. The father dies. The son is taken to the hospital. The surgeon says: "I cannot operate on this boy, he is my son." Who is the surgeon? Answer in one short sentence.',
     evaluate: (text) => {
       const t = text.toLowerCase();
-      if (t.includes('mother') || t.includes('mom') || t.includes('madre') || t.includes('parent') || t.includes('another father') || t.includes('second father')) {
-        return 100;
+      const keywords = ['mother', 'mom', 'madre', 'mère', 'mutter', 'stepfather', 'second father', 'other parent'];
+      const score = keywords.some(kw => t.includes(kw)) ? 100 : 0;
+      if (score === 0) {
+        console.warn(`\n[DEBUG] Task 3 answer was scored 0. Response text:\n${text}\n`);
       }
-      return 0;
+      return score;
     }
   }
 ];
@@ -75,6 +143,16 @@ Mark simplifications with ponytail: comment`,
   titan_lite: fs.existsSync(litePath) ? fs.readFileSync(litePath, 'utf8') : '',
   titan_aggressive: fs.existsSync(aggressivePath) ? fs.readFileSync(aggressivePath, 'utf8') : '',
 };
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function getStats(array) {
+  const n = array.length;
+  if (n === 0) return { mean: 0, std: 0 };
+  const mean = array.reduce((s, x) => s + x, 0) / n;
+  const std = n > 1 ? Math.sqrt(array.reduce((s, x) => s + Math.pow(x - mean, 2), 0) / n) : 0;
+  return { mean, std };
+}
 
 function postRequest(url, headers, body) {
   return new Promise((resolve, reject) => {
@@ -122,8 +200,9 @@ async function callAnthropic(system, user, apiKey) {
     'x-api-key': apiKey,
     'anthropic-version': '2023-06-01',
   };
+  const model = process.env.TITAN_BENCH_MODEL || 'claude-sonnet-4-6';
   const body = {
-    model: 'claude-3-5-sonnet-20241022',
+    model: model,
     max_tokens: 512,
     messages: [{ role: 'user', content: user }],
   };
@@ -153,8 +232,9 @@ async function callOpenAI(system, user, apiKey) {
   }
   messages.push({ role: 'user', content: user });
 
+  const model = process.env.TITAN_BENCH_MODEL || 'gpt-4o-mini';
   const body = {
-    model: 'gpt-4o-mini',
+    model: model,
     max_tokens: 512,
     messages,
   };
@@ -171,74 +251,107 @@ async function callOpenAI(system, user, apiKey) {
 }
 
 function runMockMode() {
-  console.log('═══════════════════════════════════════════════════════');
+  console.log('═════════════════════════════════════════════════════════════════════════════');
   console.log('  SIMULATED API BENCHMARK (MOCK MODE)');
   console.log('  Set ANTHROPIC_API_KEY or OPENAI_API_KEY for real calls');
-  console.log('═══════════════════════════════════════════════════════\n');
+  console.log('  DEMO MODE — valori illustrativi, non empirici. Esegui con API key per dati reali.');
+  console.log('═════════════════════════════════════════════════════════════════════════════\n');
 
   const mockData = {
     baseline: {
-      coding: { outputTokens: 215, score: 100 },
-      debugging: { outputTokens: 190, score: 100 },
-      logic: { outputTokens: 45, score: 100 }
+      coding: { scores: [100, 100, 100], tokens: [200, 200, 200] },
+      debugging: { scores: [100, 100, 100], tokens: [190, 190, 190] },
+      logic: { scores: [100, 100, 100], tokens: [40, 40, 40] }
     },
     caveman: {
-      coding: { outputTokens: 75, score: 100 },
-      debugging: { outputTokens: 80, score: 100 },
-      logic: { outputTokens: 20, score: 100 }
+      coding: { scores: [100, 100, 100], tokens: [80, 80, 80] },
+      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
+      logic: { scores: [100, 100, 100], tokens: [20, 20, 20] }
     },
     ponytail: {
-      coding: { outputTokens: 68, score: 100 },
-      debugging: { outputTokens: 75, score: 70 },
-      logic: { outputTokens: 25, score: 80 }
+      coding: { scores: [100, 100, 100], tokens: [70, 70, 70] },
+      debugging: { scores: [70, 70, 70], tokens: [75, 75, 75] },
+      logic: { scores: [80, 80, 80], tokens: [25, 25, 25] }
     },
     titan: {
-      coding: { outputTokens: 78, score: 100 },
-      debugging: { outputTokens: 82, score: 100 },
-      logic: { outputTokens: 22, score: 100 }
+      coding: { scores: [100, 100, 100], tokens: [80, 80, 80] },
+      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
+      logic: { scores: [100, 100, 100], tokens: [20, 20, 20] }
     },
     titan_lite: {
-      coding: { outputTokens: 75, score: 100 },
-      debugging: { outputTokens: 80, score: 100 },
-      logic: { outputTokens: 24, score: 100 }
+      coding: { scores: [100, 100, 100], tokens: [75, 75, 75] },
+      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
+      logic: { scores: [100, 100, 100], tokens: [25, 25, 25] }
     },
     titan_aggressive: {
-      coding: { outputTokens: 45, score: 100 },
-      debugging: { outputTokens: 52, score: 90 },
-      logic: { outputTokens: 18, score: 60 }
+      coding: { scores: [100, 100, 100], tokens: [45, 45, 45] },
+      debugging: { scores: [90, 90, 90], tokens: [50, 50, 50] },
+      logic: { scores: [60, 60, 60], tokens: [20, 20, 20] }
     }
   };
 
-  printTable(mockData);
+  printTable(mockData, 'mock');
 }
 
-function printTable(results) {
-  console.log('-----------------------------------------------------------------------------------------------------------------');
-  console.log('| Variant          | Coding Score | Debug Score | Logic Score | Avg Score % | Avg Tokens | UID (Density) | status  |');
-  console.log('-----------------------------------------------------------------------------------------------------------------');
+function printTable(results, source) {
+  console.log('-'.repeat(133));
+  console.log('| Variant          | Coding Score | Debug Score | Logic Score | Avg Score %   | Avg Tokens    | UID (Density) | Status    | Source |');
+  console.log('-'.repeat(133));
 
-  for (const [variantName, tasksData] of Object.entries(results)) {
-    const codingScore = tasksData.coding.score;
-    const debuggingScore = tasksData.debugging.score;
-    const logicScore = tasksData.logic.score;
-    const avgScore = Math.round((codingScore + debuggingScore + logicScore) / 3);
-    const avgTokens = Math.round((tasksData.coding.outputTokens + tasksData.debugging.outputTokens + tasksData.logic.outputTokens) / 3);
-    
+  const order = ['baseline', 'caveman', 'ponytail', 'titan', 'titan_lite', 'titan_aggressive'];
+
+  for (const variantName of order) {
+    const tasksData = results[variantName];
+    if (!tasksData) continue;
+
+    const codingScores = tasksData.coding.scores;
+    const codingTokens = tasksData.coding.tokens;
+    const debuggingScores = tasksData.debugging.scores;
+    const debuggingTokens = tasksData.debugging.tokens;
+    const logicScores = tasksData.logic.scores;
+    const logicTokens = tasksData.logic.tokens;
+
+    const codingMeanScore = codingScores.reduce((a, b) => a + b, 0) / codingScores.length;
+    const debuggingMeanScore = debuggingScores.reduce((a, b) => a + b, 0) / debuggingScores.length;
+    const logicMeanScore = logicScores.reduce((a, b) => a + b, 0) / logicScores.length;
+
+    // Calculate overall stats by averaging the runs
+    const numRuns = codingTokens.length;
+    const runScores = [];
+    const runTokens = [];
+    for (let r = 0; r < numRuns; r++) {
+      runScores.push((codingScores[r] + debuggingScores[r] + logicScores[r]) / 3);
+      runTokens.push((codingTokens[r] + debuggingTokens[r] + logicTokens[r]) / 3);
+    }
+    const scoreStats = getStats(runScores);
+    const tokenStats = getStats(runTokens);
+
+    const avgScore = scoreStats.mean;
+    const avgTokens = tokenStats.mean;
+
     // UID = Avg Score % / Avg Tokens * 1000
     const uid = avgTokens > 0 ? ((avgScore / avgTokens) * 1000).toFixed(1) : '0.0';
-    
+
     let status = 'Reliable';
     if (avgScore < 80) status = '⚠ Degraded';
     if (avgScore < 60) status = '❌ Fragile';
 
-    console.log(`| ${variantName.padEnd(16)} | ${codingScore.toString().padStart(11)}% | ${debuggingScore.toString().padStart(10)}% | ${logicScore.toString().padStart(10)}% | ${avgScore.toString().padStart(10)}% | ${avgTokens.toString().padStart(10)} | ${uid.toString().padStart(13)} | ${status.padEnd(7)} |`);
+    const codingScoreStr = Math.round(codingMeanScore) + '%';
+    const debuggingScoreStr = Math.round(debuggingMeanScore) + '%';
+    const logicScoreStr = Math.round(logicMeanScore) + '%';
+
+    const avgScoreStr = `${Math.round(scoreStats.mean)}% ±${Math.round(scoreStats.std)}`;
+    const avgTokensStr = `${Math.round(tokenStats.mean)} ±${Math.round(tokenStats.std)}`;
+
+    console.log(`| ${variantName.padEnd(16)} | ${codingScoreStr.padStart(12)} | ${debuggingScoreStr.padStart(11)} | ${logicScoreStr.padStart(11)} | ${avgScoreStr.padStart(13)} | ${avgTokensStr.padStart(13)} | ${uid.padStart(13)} | ${status.padEnd(9)} | ${source.padEnd(6)} |`);
   }
-  console.log('-----------------------------------------------------------------------------------------------------------------');
+  console.log('-'.repeat(133));
   console.log('\nDefinitions:');
-  console.log('- **Avg Score %**: Rubric-based accuracy distribution across all task categories.');
-  console.log('- **Avg Tokens**: Mean output token count per task.');
+  console.log('- **Avg Score %**: Rubric-based accuracy distribution across all task categories (mean ± standard deviation).');
+  console.log('- **Avg Tokens**: Mean output token count per task (mean ± standard deviation).');
   console.log('- **UID (Usable Intelligence Density)**: (Avg Score % / Avg Tokens) * 1000. Ratio of task intelligence preserved per token.');
   console.log('- **Status**: Safety indicators based on reasoning retention curve.');
+  console.log('- **Source**: Source of the data (\'mock\' for simulation, \'api\' for real API calls).');
 }
 
 async function runBenchmark() {
@@ -251,40 +364,81 @@ async function runBenchmark() {
   }
 
   const provider = anthropicKey ? 'Anthropic' : 'OpenAI';
+  const model = anthropicKey 
+    ? (process.env.TITAN_BENCH_MODEL || 'claude-sonnet-4-6')
+    : (process.env.TITAN_BENCH_MODEL || 'gpt-4o-mini');
+
   console.log('═══════════════════════════════════════════════════════');
-  console.log(`  REAL API BENCHMARK via ${provider} (Multi-Task Curve)`);
+  console.log(`  REAL API BENCHMARK via ${provider} (${model})`);
   console.log('═══════════════════════════════════════════════════════\n');
 
+  const RUNS_PER_TASK = process.env.TITAN_BENCH_RUNS ? parseInt(process.env.TITAN_BENCH_RUNS, 10) : 3;
   const results = {};
+  const order = ['baseline', 'caveman', 'ponytail', 'titan', 'titan_lite', 'titan_aggressive'];
 
-  for (const [name, systemPrompt] of Object.entries(SYSTEM_PROMPTS)) {
+  for (const name of order) {
+    const systemPrompt = SYSTEM_PROMPTS[name];
     console.log(`\nTesting variant: [${name}]`);
     results[name] = {};
 
     for (const task of TASKS) {
       console.log(`  Running ${task.name}...`);
-      try {
-        let res;
-        if (anthropicKey) {
-          res = await callAnthropic(systemPrompt, task.prompt, anthropicKey);
-        } else {
-          res = await callOpenAI(systemPrompt, task.prompt, openaiKey);
+      results[name][task.id] = { scores: [], tokens: [] };
+
+      for (let run = 0; run < RUNS_PER_TASK; run++) {
+        if (run > 0) {
+          await sleep(500);
         }
-        const score = task.evaluate(res.text);
-        results[name][task.id] = {
-          outputTokens: res.outputTokens,
-          score: score
-        };
-        console.log(`    Tokens: ${res.outputTokens} | Rubric Score: ${score}%`);
-      } catch (err) {
-        console.error(`    Error: ${err.message}`);
-        results[name][task.id] = { outputTokens: 0, score: 0 };
+        console.log(`    Run ${run + 1}/${RUNS_PER_TASK}...`);
+        try {
+          let res;
+          if (anthropicKey) {
+            res = await callAnthropic(systemPrompt, task.prompt, anthropicKey);
+          } else {
+            res = await callOpenAI(systemPrompt, task.prompt, openaiKey);
+          }
+          const score = task.evaluate(res.text);
+          results[name][task.id].scores.push(score);
+          results[name][task.id].tokens.push(res.outputTokens);
+          console.log(`      Tokens: ${res.outputTokens} | Rubric Score: ${score}%`);
+        } catch (err) {
+          console.error(`      Error: ${err.message}`);
+          results[name][task.id].scores.push(0);
+          results[name][task.id].tokens.push(0);
+        }
       }
     }
   }
 
   console.log('\nResults Matrix (Cognitive Degradation Curve):\n');
-  printTable(results);
+  printTable(results, 'api');
+
+  const timestamp = new Date().toISOString();
+  console.log('\n─────────────────────────────────────────');
+  console.log('Run info:');
+  console.log(`  Provider : ${provider} (${model})`);
+  console.log(`  Runs/task: ${RUNS_PER_TASK}`);
+  console.log('  Tasks    : coding, debugging, logic');
+  console.log(`  Timestamp: ${timestamp}`);
+  console.log('  Source   : REAL API (empirical)');
+  console.log('─────────────────────────────────────────\n');
+
+  // Save automatically to root
+  const resultsData = {
+    timestamp,
+    provider,
+    model,
+    runs_per_task: RUNS_PER_TASK,
+    results
+  };
+
+  try {
+    const outputPath = path.join(__dirname, '..', '.titan-bench-results.json');
+    fs.writeFileSync(outputPath, JSON.stringify(resultsData, null, 2), 'utf8');
+    console.log(`Saved benchmark results to: ${outputPath}\n`);
+  } catch (err) {
+    console.error(`Failed to save results: ${err.message}`);
+  }
 }
 
 module.exports = { runBenchmark };
