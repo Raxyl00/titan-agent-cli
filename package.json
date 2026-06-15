@@ -1,6 +1,6 @@
 {
   "name": "titan-agent-cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Unified token compression framework for LLM agents. Three orthogonal layers: Linguistic (L1), Structural (L2), Contextual (L3). Universal compatibility across 9+ AI coding agents.",
   "main": "src/cli.js",
   "bin": {
