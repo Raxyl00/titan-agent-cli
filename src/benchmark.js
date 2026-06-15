@@ -4,7 +4,48 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const USER_PROMPT = 'Write a JavaScript function to filter and map a list of products. The function should filter products that are out of stock (stock === 0) and map them to return an array of objects with only the id, name, and totalValue (price * stock). Explain the code.';
+// --- Benchmark Tasks & Rubrics ---
+const TASKS = [
+  {
+    id: 'coding',
+    name: 'Task 1: Coding (Product Filter)',
+    prompt: 'Write a JavaScript function to filter a list of products. Filter out items where stock is 0. Map the rest to return objects with id, name, and totalValue (price * stock). Explain the code.',
+    evaluate: (text) => {
+      let score = 0;
+      const t = text.toLowerCase();
+      // Check syntax/concepts
+      if (t.includes('filter')) score += 30;
+      if (t.includes('map')) score += 30;
+      if (t.includes('stock') && (t.includes('>') || t.includes('!==') || t.includes('stock)'))) score += 20;
+      if (t.includes('price') && t.includes('stock')) score += 20;
+      return score;
+    }
+  },
+  {
+    id: 'debugging',
+    name: 'Task 2: Debugging (Circular Dependency)',
+    prompt: 'In Node.js, user-service.js requires auth-service.js, and auth-service.js requires user-service.js. Why does this cause issues and how do you fix it?',
+    evaluate: (text) => {
+      let score = 0;
+      const t = text.toLowerCase();
+      if (t.includes('circular') || t.includes('cycle') || t.includes('loop')) score += 40;
+      if (t.includes('inject') || t.includes('dependency injection') || t.includes('refactor') || t.includes('pass') || t.includes('require') || t.includes('export')) score += 60;
+      return score;
+    }
+  },
+  {
+    id: 'logic',
+    name: 'Task 3: Logic (Surgeon Riddle)',
+    prompt: 'A father and son are in a car accident. The father dies. The son is taken to the hospital. The surgeon says: "I cannot operate on this boy, he is my son." Who is the surgeon? Answer in one short sentence.',
+    evaluate: (text) => {
+      const t = text.toLowerCase();
+      if (t.includes('mother') || t.includes('mom') || t.includes('madre') || t.includes('parent') || t.includes('another father') || t.includes('second father')) {
+        return 100;
+      }
+      return 0;
+    }
+  }
+];
 
 // Load prompt contents
 const masterPath = path.join(__dirname, '..', 'skills', 'master.md');
@@ -83,7 +124,7 @@ async function callAnthropic(system, user, apiKey) {
   };
   const body = {
     model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 1024,
+    max_tokens: 512,
     messages: [{ role: 'user', content: user }],
   };
   if (system) {
@@ -114,7 +155,7 @@ async function callOpenAI(system, user, apiKey) {
 
   const body = {
     model: 'gpt-4o-mini',
-    max_tokens: 1024,
+    max_tokens: 512,
     messages,
   };
 
@@ -135,67 +176,69 @@ function runMockMode() {
   console.log('  Set ANTHROPIC_API_KEY or OPENAI_API_KEY for real calls');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  console.log(`Prompt: "${USER_PROMPT}"\n`);
-
   const mockData = {
     baseline: {
-      text: `Sure! I can write that function for you...`,
-      inputTokens: 90,
-      outputTokens: 215,
-      elapsed: 2300,
+      coding: { outputTokens: 215, score: 100 },
+      debugging: { outputTokens: 190, score: 100 },
+      logic: { outputTokens: 45, score: 100 }
     },
     caveman: {
-      text: `...`,
-      inputTokens: 170,
-      outputTokens: 75,
-      elapsed: 900,
+      coding: { outputTokens: 75, score: 100 },
+      debugging: { outputTokens: 80, score: 100 },
+      logic: { outputTokens: 20, score: 100 }
     },
     ponytail: {
-      text: `...`,
-      inputTokens: 180,
-      outputTokens: 68,
-      elapsed: 850,
+      coding: { outputTokens: 68, score: 100 },
+      debugging: { outputTokens: 75, score: 70 },
+      logic: { outputTokens: 25, score: 80 }
     },
     titan: {
-      text: `...`,
-      inputTokens: 490,
-      outputTokens: 78,
-      elapsed: 1100,
+      coding: { outputTokens: 78, score: 100 },
+      debugging: { outputTokens: 82, score: 100 },
+      logic: { outputTokens: 22, score: 100 }
     },
     titan_lite: {
-      text: `...`,
-      inputTokens: 210,
-      outputTokens: 75,
-      elapsed: 950,
+      coding: { outputTokens: 75, score: 100 },
+      debugging: { outputTokens: 80, score: 100 },
+      logic: { outputTokens: 24, score: 100 }
     },
     titan_aggressive: {
-      text: `...`,
-      inputTokens: 250,
-      outputTokens: 45,
-      elapsed: 800,
-    },
+      coding: { outputTokens: 45, score: 100 },
+      debugging: { outputTokens: 52, score: 90 },
+      logic: { outputTokens: 18, score: 60 }
+    }
   };
 
   printTable(mockData);
 }
 
 function printTable(results) {
-  console.log('| System Prompt | Input Tokens | Output Tokens | Savings % | Elapsed |');
-  console.log('|---------------|--------------|---------------|-----------|---------|');
+  console.log('-----------------------------------------------------------------------------------------------------------------');
+  console.log('| Variant          | Coding Score | Debug Score | Logic Score | Avg Score % | Avg Tokens | UID (Density) | status  |');
+  console.log('-----------------------------------------------------------------------------------------------------------------');
 
-  const baseOutput = results.baseline.outputTokens;
+  for (const [variantName, tasksData] of Object.entries(results)) {
+    const codingScore = tasksData.coding.score;
+    const debuggingScore = tasksData.debugging.score;
+    const logicScore = tasksData.logic.score;
+    const avgScore = Math.round((codingScore + debuggingScore + logicScore) / 3);
+    const avgTokens = Math.round((tasksData.coding.outputTokens + tasksData.debugging.outputTokens + tasksData.logic.outputTokens) / 3);
+    
+    // UID = Avg Score % / Avg Tokens * 1000
+    const uid = avgTokens > 0 ? ((avgScore / avgTokens) * 1000).toFixed(1) : '0.0';
+    
+    let status = 'Reliable';
+    if (avgScore < 80) status = '⚠ Degraded';
+    if (avgScore < 60) status = '❌ Fragile';
 
-  for (const [name, r] of Object.entries(results)) {
-    const savings = name === 'baseline' ? 0 : Math.round((1 - r.outputTokens / baseOutput) * 100);
-    const savingsStr = name === 'baseline' ? '-' : `${savings}%`;
-    console.log(`| ${name.padEnd(16)} | ${r.inputTokens.toString().padStart(12)} | ${r.outputTokens.toString().padStart(13)} | ${savingsStr.padStart(9)} | ${(r.elapsed / 1000).toFixed(2)}s |`);
+    console.log(`| ${variantName.padEnd(16)} | ${codingScore.toString().padStart(11)}% | ${debuggingScore.toString().padStart(10)}% | ${logicScore.toString().padStart(10)}% | ${avgScore.toString().padStart(10)}% | ${avgTokens.toString().padStart(10)} | ${uid.toString().padStart(13)} | ${status.padEnd(7)} |`);
   }
-  console.log('\nAnalysis:');
-  console.log('- **Caveman** achieves high savings (~65%) by dropping prose grammar/pleasantries.');
-  console.log('- **Ponytail** achieves high savings (~68%) by writing extremely concise/lazy code.');
-  console.log('- **TITAN** combines both. It has a higher input token cost due to L1+L2+L3 instructions, but keeps output compressed (~64%).');
-  console.log('- **TITAN Lite** provides the same behavior modification but cuts the input token cost in half.');
-  console.log('- **TITAN Aggressive** uses telegraphic rules to shrink output even further (~79% savings).');
+  console.log('-----------------------------------------------------------------------------------------------------------------');
+  console.log('\nDefinitions:');
+  console.log('- **Avg Score %**: Rubric-based accuracy distribution across all task categories.');
+  console.log('- **Avg Tokens**: Mean output token count per task.');
+  console.log('- **UID (Usable Intelligence Density)**: (Avg Score % / Avg Tokens) * 1000. Ratio of task intelligence preserved per token.');
+  console.log('- **Status**: Safety indicators based on reasoning retention curve.');
 }
 
 async function runBenchmark() {
@@ -209,35 +252,39 @@ async function runBenchmark() {
 
   const provider = anthropicKey ? 'Anthropic' : 'OpenAI';
   console.log('═══════════════════════════════════════════════════════');
-  console.log(`  REAL API BENCHMARK via ${provider}`);
+  console.log(`  REAL API BENCHMARK via ${provider} (Multi-Task Curve)`);
   console.log('═══════════════════════════════════════════════════════\n');
-
-  console.log(`Prompt: "${USER_PROMPT}"\n`);
 
   const results = {};
 
   for (const [name, systemPrompt] of Object.entries(SYSTEM_PROMPTS)) {
-    console.log(`Running prompt variant: [${name}]...`);
-    try {
-      let res;
-      if (anthropicKey) {
-        res = await callAnthropic(systemPrompt, USER_PROMPT, anthropicKey);
-      } else {
-        res = await callOpenAI(systemPrompt, USER_PROMPT, openaiKey);
+    console.log(`\nTesting variant: [${name}]`);
+    results[name] = {};
+
+    for (const task of TASKS) {
+      console.log(`  Running ${task.name}...`);
+      try {
+        let res;
+        if (anthropicKey) {
+          res = await callAnthropic(systemPrompt, task.prompt, anthropicKey);
+        } else {
+          res = await callOpenAI(systemPrompt, task.prompt, openaiKey);
+        }
+        const score = task.evaluate(res.text);
+        results[name][task.id] = {
+          outputTokens: res.outputTokens,
+          score: score
+        };
+        console.log(`    Tokens: ${res.outputTokens} | Rubric Score: ${score}%`);
+      } catch (err) {
+        console.error(`    Error: ${err.message}`);
+        results[name][task.id] = { outputTokens: 0, score: 0 };
       }
-      results[name] = res;
-      console.log(`  Done: ${res.outputTokens} output tokens in ${(res.elapsed / 1000).toFixed(2)}s`);
-    } catch (err) {
-      console.error(`  Error running ${name}: ${err.message}`);
     }
   }
 
-  console.log('\nResults Matrix:\n');
-  if (results.baseline) {
-    printTable(results);
-  } else {
-    console.error('Error: baseline test failed, unable to print results matrix.');
-  }
+  console.log('\nResults Matrix (Cognitive Degradation Curve):\n');
+  printTable(results);
 }
 
 module.exports = { runBenchmark };
