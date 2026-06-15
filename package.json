@@ -1,0 +1,47 @@
+{
+  "name": "titan-agent-cli",
+  "version": "0.1.0",
+  "description": "Unified token compression framework for LLM agents. Three orthogonal layers: Linguistic (L1), Structural (L2), Contextual (L3). Universal compatibility across 9+ AI coding agents.",
+  "main": "src/cli.js",
+  "bin": {
+    "titan": "bin/titan.js",
+    "titan-filter": "src/filter.js"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "filter:test": "node src/filter.js --test"
+  },
+  "keywords": [
+    "llm",
+    "agent",
+    "compression",
+    "token",
+    "caveman",
+    "ponytail",
+    "titan",
+    "claude",
+    "cursor",
+    "copilot",
+    "windsurf",
+    "cline",
+    "kiro",
+    "aider",
+    "antigravity"
+  ],
+  "author": "Matteo Fiorini",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "skills/",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}

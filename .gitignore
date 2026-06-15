@@ -1,0 +1,5 @@
+node_modules/
+.test-output/
+.env*
+*.original.md
+.DS_Store
