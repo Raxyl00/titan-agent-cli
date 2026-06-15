@@ -207,9 +207,7 @@ TITAN is built on the shoulders of giants. It integrates and ports the research 
 
 ## ⚠️ Disclaimer
 
-Se succede qualcosa, non voglio saperne assolutamente nulla. Per qualsiasi problema legale o di responsabilità, fa fede esclusivamente quanto scritto nella licenza MIT (ovvero: il software viene fornito "così com'è", senza alcuna garanzia).
-
-*In plain English: if it breaks, costs you money, or causes issues, it's on you. Check the LICENSE.*
+if it breaks, costs you money, or causes issues, it's on you. Check the LICENSE.*
 
 ---
 
