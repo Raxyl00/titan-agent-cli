@@ -1,9 +1,23 @@
 #!/usr/bin/env node
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { initAgent, initAll, listAgents, ADAPTER_IDS } = require('./init');
 
 const VERSION = require('../package.json').version;
+
+/**
+ * Extract --flag=value from args array.
+ */
+function getFlag(args, flag) {
+  for (const arg of args) {
+    if (arg.startsWith(flag + '=')) {
+      return arg.slice(flag.length + 1);
+    }
+  }
+  return null;
+}
 
 function printHelp() {
   const lines = [
@@ -19,6 +33,7 @@ function printHelp() {
     '    titan filter                                                Stdin/stdout terminal output filter',
     '    titan filter --test                                         Run filter self-test',
     '    titan benchmark                                             Run L1/L2/L3 token savings benchmark',
+    '    titan test                                                  Run the test suite',
     '    titan report [--reset]                                      Display ANSI savings dashboard',
     '    titan help                                                  Show this help',
     '    titan version                                               Show version',
@@ -39,6 +54,11 @@ function printVersion() {
 }
 
 function cmdInit(args) {
+  const masterPath = path.join(__dirname, '..', 'skills', 'master.md');
+  if (!fs.existsSync(masterPath)) {
+    console.warn('Warning: skills/master.md does not exist. Third-party adapters may fail to generate.');
+  }
+
   const targetDir = getFlag(args, '--dir') || process.cwd();
   const isLite = args.includes('--lite');
   const isAggressive = args.includes('--aggressive');
@@ -170,6 +190,26 @@ async function cmdBenchmark(args) {
   }
 }
 
+function cmdTest(args) {
+  const { spawnSync } = require('child_process');
+  const testsDir = path.join(__dirname, '..', 'tests');
+  
+  const testFiles = fs.readdirSync(testsDir)
+    .filter(file => file.endsWith('.test.js'))
+    .map(file => path.join(testsDir, file));
+    
+  if (testFiles.length === 0) {
+    console.log('\nNo tests found.\n');
+    return;
+  }
+
+  console.log(`\nRunning test suite: ${testFiles.length} files...\n`);
+  const result = spawnSync('node', ['--test', ...testFiles], { stdio: 'inherit' });
+  if (result.status !== 0) {
+    process.exit(result.status || 1);
+  }
+}
+
 function cmdReport(args) {
   const os = require('os');
   const fs = require('fs');
@@ -230,18 +270,6 @@ function cmdReport(args) {
 }
 
 /**
- * Extract --flag=value from args array.
- */
-function getFlag(args, flag) {
-  for (const arg of args) {
-    if (arg.startsWith(flag + '=')) {
-      return arg.slice(flag.length + 1);
-    }
-  }
-  return null;
-}
-
-/**
  * Main CLI entry point.
  */
 function main(argv) {
@@ -264,6 +292,9 @@ function main(argv) {
       break;
     case 'benchmark':
       cmdBenchmark(subArgs);
+      break;
+    case 'test':
+      cmdTest(subArgs);
       break;
     case 'report':
       cmdReport(subArgs);

@@ -94,13 +94,14 @@ titan init --agent=cursor
 # Or generate for Copilot (.github/copilot-instructions.md)
 titan init --agent=copilot
 
-# Generate a lightweight version (~375 tokens, perfect for short chats)
+# Generate a lightweight version (~620 tokens, perfect for short chats)
 titan init --agent=cursor --lite
 
-# Generate the default balanced version (~1400 tokens, standard features)
-titan init --agent=cursor --balanced
+# Generate the default balanced version (~1480 tokens, standard features)
+# Note: balanced mode is the default and does not require a flag
+titan init --agent=cursor
 
-# Generate an aggressive telegraphese version (~500 tokens, maximum compression)
+# Generate an aggressive telegraphese version (~430 tokens, maximum compression)
 titan init --agent=cursor --aggressive
 ```
 
@@ -108,7 +109,7 @@ titan init --agent=cursor --aggressive
 
 ## 🧱 The Three Layers
 
-TITAN compresses token footprint across three independent vectors that compose multiplicatively:
+TITAN compresses token footprint across three independent vectors that compose multiplicatively (theoretical maximum):
 
 ```
 Total Savings = 1 - (0.90 × 0.30 × 0.60) = 83.8%
@@ -165,6 +166,9 @@ titan report --reset
 
 # Run local or API-based token savings benchmark
 titan benchmark
+
+# Run the test suite
+titan test
 ```
 
 ---
@@ -203,7 +207,7 @@ ANTHROPIC_API_KEY=sk-... titan benchmark
 OPENAI_API_KEY=sk-... titan benchmark
 ```
 > [!NOTE]
-> Il modello usato è configurabile via `TITAN_BENCH_MODEL`. Il modello di default per Anthropic è `claude-sonnet-4-6`, mentre per OpenAI è `gpt-4o-mini`.
+> The target model is configurable via `TITAN_BENCH_MODEL`. The default model for Anthropic is `claude-sonnet-4-6`, while for OpenAI it is `gpt-4o-mini`.
 
 ### Evaluation Metrics & UID
 It evaluates the **Usable Intelligence Density (UID)**:
@@ -213,20 +217,32 @@ UID = (Avg Accuracy % / Avg Output Tokens) * 1000
 This represents the reasoning throughput preserved per token of context.
 
 > [!IMPORTANT]
-> ⚠ Dati da mock mode — non empirici (i dati sotto riportati in tabella sono da run reale con API o mock se non disponibile, ed in questo caso sono a scopo illustrativo).
-> I valori di caveman e ponytail servono come baseline di confronto per i componenti upstream integrati in TITAN.
+> ⚠ Mock mode data — non-empirical (the table below is from simulated demonstration data, used when APIs are not active).
+> Caveman and Ponytail values serve as baseline comparisons for upstream components integrated into TITAN.
 
-| Variant | Coding Score | Debug Score | Logic Score | Avg Score % | Avg Tokens | UID (Density) | Status |
-|---|---|---|---|---|---|---|---|
-| **Baseline** | 100% | 100% | 100% | 100% ±0% | 143 ±0 | 697.7 | Reliable |
-| **Caveman** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
-| **Ponytail** | 100% | 70% | 80% | 83% ±0% | 57 ±0 | 1470.6 | Reliable |
-| **TITAN Balanced** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
-| **TITAN Lite** | 100% | 100% | 100% | 100% ±0% | 60 ±0 | 1666.7 | Reliable |
-| **TITAN Aggressive** | 100% | 90% | 60% | 83% ±0% | 38 ±0 | 2173.9 | Reliable |
+| Variant | Coding | Debug | Logic | Refact | Review | Avg Score % | Avg In Tok | Avg Out Tok | Avg Tot Tok | UID (Density) | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Baseline** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 50 ±0 | 198 ±8 | 248 ±8 | 403.2 | Reliable |
+| **Caveman** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 120 ±0 | 78 ±5 | 198 ±5 | 505.1 | Reliable |
+| **Ponytail** | 100% | 70% | 80% | 100% | 80% | 86% ±12% | 115 ±0 | 67 ±6 | 182 ±6 | 472.5 | Reliable |
+| **TITAN Balanced** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 1500 ±0 | 80 ±5 | 1580 ±5 | 63.3 | Reliable |
+| **TITAN Lite** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 425 ±0 | 91 ±7 | 516 ±7 | 193.8 | Reliable |
+| **TITAN Aggressive** | 95% | 80% | 60% | 90% | 70% | 79% ±12% | 400 ±0 | 50 ±3 | 450 ±3 | 175.6 | ⚠ Degraded |
 
 * **Balanced/Lite**: Maximize token density while retaining a flat 100% cognitive success rate.
-* **Aggressive**: Telegraphic mode. Achieves the highest density (~38 tokens per response), but logic reasoning starts to degrade on complex deduction.
+* **Aggressive**: Telegraphic mode. Achieves high density (~50 tokens output per response), but logic reasoning starts to degrade on complex tasks.
+
+---
+
+## 📊 Implementation Status
+
+The framework is partially implemented according to the core architectural vision:
+
+* ✅ **L1 Linguistic Compression (Caveman Engine)**: Fully implemented in `src/compress.js` and prompt structures.
+* ✅ **L3 Contextual Compression (filter, compress, adapters)**: CLI filters, file compression, and 9+ agent adapters are functional.
+* ❌ **L2 Master Prompt (Runtime Auto-injection)**: Not implemented (master prompts are compiled statically; no dynamic runtime agent proxying).
+* ❌ **Auto-Clarity Runtime**: Only prompt-level instructions exist; there is no runtime execution interception.
+* ❌ **Context Window Manager**: Planned for future releases (dynamic slot allocation and window pruning).
 
 ---
 
@@ -250,7 +266,7 @@ TITAN is built on the shoulders of giants. It integrates and ports the research 
 
 ## ⚠️ Disclaimer
 
-if it breaks, costs you money, or causes issues, it's on you. Check the LICENSE.*
+If it breaks, costs you money, or causes issues, it's on you. Check the LICENSE.
 
 ---
 

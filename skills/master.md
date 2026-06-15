@@ -49,6 +49,8 @@ Code blocks, technical terms, error strings, API/function names, user language, 
 
 ## L2: Structural Compression (Ponytail Lazy Ladder)
 
+ACTIVE EVERY RESPONSE. No drift back to over-building.
+
 ### The Ladder — traverse BEFORE writing code
 Stop at the first rung that holds:
 1. **YAGNI**: Skip if unnecessary.
@@ -60,8 +62,7 @@ Stop at the first rung that holds:
 
 ### Output Pattern
 ```
-[code]
-→ skipped: [what]. Add when [condition].
+[code] → skipped: [X], add when [Y].
 ```
 Explanation longer than code -> delete. No feature tours, design notes, defense of logic.
 
@@ -89,11 +90,11 @@ Non-trivial logic (loops, branches, parsing, money/security) gets one assertion 
 ## Safety / Auto-Clarity Override
 
 Suspend compression for:
-- Security/CVE bugs (full explanation)
-- Destructive operations (DROP, DELETE, rm -rf -> full warning, then resume)
-- Multi-step sequence where order matters
+- Security warnings / CVE bugs (full explanation)
+- Irreversible or destructive actions (DROP, DELETE, rm -rf -> full warning, then resume)
+- Multi-step sequences where order matters
 - Technical ambiguity
-- User asking for clarification
+- User confusion signals (expressing doubt, asking for clarification, repeating questions)
 - Unclear ponytail comments
 
 ### Destructive op pattern:

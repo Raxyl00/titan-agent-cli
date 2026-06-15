@@ -116,8 +116,33 @@ function estimateTokens(text) {
 }
 
 /**
- * Split markdown into code and prose blocks.
- * Returns array of { type: 'code'|'prose', content }.
+ * Split prose segment into prose and table blocks.
+ * Returns array of { type: 'prose'|'table', content }.
+ */
+function splitProseAndTables(text) {
+  const blocks = [];
+  const tableRegex = /^(\s*\|[^\n]*\n\s*\|[\s\-:|]*\n(\s*\|[^\n]*\n?)*)/gm;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tableRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      blocks.push({ type: 'prose', content: text.slice(lastIndex, match.index) });
+    }
+    blocks.push({ type: 'table', content: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    blocks.push({ type: 'prose', content: text.slice(lastIndex) });
+  }
+
+  return blocks;
+}
+
+/**
+ * Split markdown into code, table, and prose blocks.
+ * Returns array of { type: 'code'|'table'|'prose', content }.
  */
 function splitBlocks(content) {
   const blocks = [];
@@ -126,18 +151,20 @@ function splitBlocks(content) {
   let match;
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
-    // Prose before code block
+    // Prose before code block (may contain tables)
     if (match.index > lastIndex) {
-      blocks.push({ type: 'prose', content: content.slice(lastIndex, match.index) });
+      const proseSegment = content.slice(lastIndex, match.index);
+      blocks.push(...splitProseAndTables(proseSegment));
     }
     // Code block (preserved verbatim)
     blocks.push({ type: 'code', content: match[0] });
     lastIndex = match.index + match[0].length;
   }
 
-  // Remaining prose
+  // Remaining prose (may contain tables)
   if (lastIndex < content.length) {
-    blocks.push({ type: 'prose', content: content.slice(lastIndex) });
+    const proseSegment = content.slice(lastIndex);
+    blocks.push(...splitProseAndTables(proseSegment));
   }
 
   return blocks;
@@ -145,12 +172,19 @@ function splitBlocks(content) {
 
 /**
  * Apply L1 compression rules to a prose string.
- * Preserves: URLs, file paths, technical terms in backticks.
+ * Preserves: URLs, file paths, technical terms in backticks, and specific edge cases like A*.
  */
 function compressProse(text) {
   // Extract and protect inline code, URLs, and file paths
   const protected_items = [];
   let protectedText = text;
+
+  // Protect A* (e.g. A* search)
+  protectedText = protectedText.replace(/\bA\*(?!\w)/g, (match) => {
+    const idx = protected_items.length;
+    protected_items.push(match);
+    return `\x00PROT${idx}\x00`;
+  });
 
   // Protect inline code (`...`)
   protectedText = protectedText.replace(/`[^`]+`/g, (match) => {
@@ -193,7 +227,7 @@ function compressProse(text) {
 function compress(content) {
   const blocks = splitBlocks(content);
   const compressed = blocks.map(block => {
-    if (block.type === 'code') return block.content;
+    if (block.type === 'code' || block.type === 'table') return block.content;
     return compressProse(block.content);
   }).join('');
 

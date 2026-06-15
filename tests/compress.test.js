@@ -67,6 +67,11 @@ describe('TITAN Compress', () => {
       const result = compressProse('word  word');
       assert.ok(!result.includes('  '));
     });
+
+    it('should preserve A* search and similar edge cases', () => {
+      const result = compressProse('We use A* search for pathfinding.');
+      assert.ok(result.includes('A* search'));
+    });
   });
 
   describe('compress (full pipeline)', () => {
@@ -88,6 +93,18 @@ describe('TITAN Compress', () => {
       assert.ok(typeof result.compressedTokens === 'number');
       assert.ok(typeof result.savings === 'number');
       assert.ok(typeof result.savedTokens === 'number');
+    });
+
+    it('should preserve markdown table formatting and alignment', () => {
+      const input = `Here is a table:
+| Header 1 | Header 2 |
+| --- | --- |
+| The value 1 | A value 2 |
+| Some long value | Another one |`;
+      const result = compress(input);
+      assert.ok(result.compressed.includes('| Header 1 | Header 2 |'));
+      assert.ok(result.compressed.includes('| --- | --- |'));
+      assert.ok(result.compressed.includes('| The value 1 | A value 2 |'));
     });
   });
 

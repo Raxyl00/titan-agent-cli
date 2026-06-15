@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { estimateTokens } = require('./compress');
 
 // --- Benchmark Tasks & Rubrics ---
 const TASKS = [
@@ -110,6 +111,69 @@ const TASKS = [
       if (score === 0) {
         console.warn(`\n[DEBUG] Task 3 answer was scored 0. Response text:\n${text}\n`);
       }
+      return score;
+    }
+  },
+  {
+    id: 'refactoring',
+    name: 'Task 4: Refactoring (External Dependencies)',
+    prompt: 'Refactor the following function to remove unnecessary external dependencies. Use the Node.js standard library or native JavaScript where possible.\n```javascript\nconst lodash = require(\'lodash\');\nconst moment = require(\'moment\');\n\nfunction processUserData(users) {\n  const activeUsers = lodash.filter(users, user => user.isActive);\n  const sorted = lodash.sortBy(activeUsers, [\'age\']);\n  return lodash.map(sorted, user => {\n    return {\n      name: lodash.upperFirst(user.name),\n      formattedDate: moment(user.createdAt).format(\'YYYY-MM-DD\')\n    };\n  });\n}\n```\nExplain the changes made.',
+    evaluate: (text) => {
+      let score = 0;
+      const t = text.toLowerCase();
+
+      // 1. Remove lodash/moment requirements (+30 pts)
+      const removedDeps = !t.includes("require('lodash')") && !t.includes("require('moment')") && !t.includes("require(\"lodash\")") && !t.includes("require(\"moment\")");
+      if (removedDeps) {
+        score += 30;
+      }
+
+      // 2. Use native filter (+20 pts)
+      if (t.includes('.filter(')) {
+        score += 20;
+      }
+
+      // 3. Use native sort or map (+20 pts)
+      if (t.includes('.sort(') || t.includes('.map(')) {
+        score += 20;
+      }
+
+      // 4. Native string capitalize/upperFirst (+15 pts)
+      if (t.includes('touppercase') || t.includes('charat') || t.includes('[0]')) {
+        score += 15;
+      }
+
+      // 5. Native date formatting (+15 pts)
+      if (t.includes('slice') || t.includes('split') || t.includes('date') || t.includes('intl')) {
+        score += 15;
+      }
+
+      return score;
+    }
+  },
+  {
+    id: 'review',
+    name: 'Task 5: Code Review (Over-engineering)',
+    prompt: 'Perform a code review of this diff. Focus on identifying over-engineering, unnecessary abstractions, or YAGNI violations.\n```diff\n- function calculateTotal(items) {\n-   return items.reduce((sum, item) => sum + item.price, 0);\n- }\n+ class TotalCalculatorStrategy {\n+   calculate(items) {\n+     throw new Error(\'Not implemented\');\n+   }\n+ }\n+ class SimpleTotalCalculator extends TotalCalculatorStrategy {\n+   calculate(items) {\n+     return items.reduce((sum, item) => sum + item.price, 0);\n+   }\n+ }\n+ class CalculatorFactory {\n+   static getCalculator(type) {\n+     if (type === \'simple\') return new SimpleTotalCalculator();\n+     throw new Error(\'Unknown type\');\n+   }\n+ }\n```\nExplain the feedback concisely.',
+    evaluate: (text) => {
+      let score = 0;
+      const t = text.toLowerCase();
+
+      // 1. Identify over-engineering or YAGNI (+40 pts)
+      if (t.includes('yagni') || t.includes('over-engineer') || t.includes('overengineer') || t.includes('abstraction')) {
+        score += 40;
+      }
+
+      // 2. Identify factory or strategy pattern (+30 pts)
+      if (t.includes('factory') || t.includes('strategy') || t.includes('class')) {
+        score += 30;
+      }
+
+      // 3. Suggest keeping original or simple function (+30 pts)
+      if (t.includes('keep') || t.includes('original') || t.includes('simple') || t.includes('revert') || t.includes('reduce')) {
+        score += 30;
+      }
+
       return score;
     }
   }
@@ -254,39 +318,51 @@ function runMockMode() {
   console.log('═════════════════════════════════════════════════════════════════════════════');
   console.log('  SIMULATED API BENCHMARK (MOCK MODE)');
   console.log('  Set ANTHROPIC_API_KEY or OPENAI_API_KEY for real calls');
-  console.log('  DEMO MODE — valori illustrativi, non empirici. Esegui con API key per dati reali.');
+  console.log('  DEMO MODE — illustrative values, not empirical. Run with API key for real data.');
   console.log('═════════════════════════════════════════════════════════════════════════════\n');
 
   const mockData = {
     baseline: {
-      coding: { scores: [100, 100, 100], tokens: [200, 200, 200] },
-      debugging: { scores: [100, 100, 100], tokens: [190, 190, 190] },
-      logic: { scores: [100, 100, 100], tokens: [40, 40, 40] }
+      coding: { scores: [100, 100, 100], tokens: [220, 210, 230], inputTokens: [50, 50, 50] },
+      debugging: { scores: [100, 100, 100], tokens: [195, 190, 205], inputTokens: [50, 50, 50] },
+      logic: { scores: [100, 100, 100], tokens: [45, 40, 50], inputTokens: [50, 50, 50] },
+      refactoring: { scores: [100, 100, 100], tokens: [250, 240, 260], inputTokens: [50, 50, 50] },
+      review: { scores: [100, 100, 100], tokens: [280, 270, 290], inputTokens: [50, 50, 50] }
     },
     caveman: {
-      coding: { scores: [100, 100, 100], tokens: [80, 80, 80] },
-      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
-      logic: { scores: [100, 100, 100], tokens: [20, 20, 20] }
+      coding: { scores: [100, 100, 100], tokens: [85, 80, 90], inputTokens: [120, 120, 120] },
+      debugging: { scores: [100, 100, 100], tokens: [80, 75, 85], inputTokens: [120, 120, 120] },
+      logic: { scores: [100, 100, 100], tokens: [20, 18, 22], inputTokens: [120, 120, 120] },
+      refactoring: { scores: [100, 100, 100], tokens: [95, 90, 100], inputTokens: [120, 120, 120] },
+      review: { scores: [100, 100, 100], tokens: [110, 105, 115], inputTokens: [120, 120, 120] }
     },
     ponytail: {
-      coding: { scores: [100, 100, 100], tokens: [70, 70, 70] },
-      debugging: { scores: [70, 70, 70], tokens: [75, 75, 75] },
-      logic: { scores: [80, 80, 80], tokens: [25, 25, 25] }
+      coding: { scores: [100, 100, 100], tokens: [75, 70, 80], inputTokens: [115, 115, 115] },
+      debugging: { scores: [70, 70, 70], tokens: [70, 65, 75], inputTokens: [115, 115, 115] },
+      logic: { scores: [80, 80, 80], tokens: [25, 22, 28], inputTokens: [115, 115, 115] },
+      refactoring: { scores: [100, 100, 100], tokens: [80, 75, 85], inputTokens: [115, 115, 115] },
+      review: { scores: [80, 80, 80], tokens: [90, 85, 95], inputTokens: [115, 115, 115] }
     },
     titan: {
-      coding: { scores: [100, 100, 100], tokens: [80, 80, 80] },
-      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
-      logic: { scores: [100, 100, 100], tokens: [20, 20, 20] }
+      coding: { scores: [100, 100, 100], tokens: [80, 75, 85], inputTokens: [1500, 1500, 1500] },
+      debugging: { scores: [100, 100, 100], tokens: [82, 78, 86], inputTokens: [1500, 1500, 1500] },
+      logic: { scores: [100, 100, 100], tokens: [22, 20, 24], inputTokens: [1500, 1500, 1500] },
+      refactoring: { scores: [100, 100, 100], tokens: [90, 85, 95], inputTokens: [1500, 1500, 1500] },
+      review: { scores: [100, 100, 100], tokens: [105, 100, 110], inputTokens: [1500, 1500, 1500] }
     },
     titan_lite: {
-      coding: { scores: [100, 100, 100], tokens: [75, 75, 75] },
-      debugging: { scores: [100, 100, 100], tokens: [80, 80, 80] },
-      logic: { scores: [100, 100, 100], tokens: [25, 25, 25] }
+      coding: { scores: [100, 100, 100], tokens: [95, 90, 100], inputTokens: [425, 425, 425] },
+      debugging: { scores: [100, 100, 100], tokens: [100, 95, 105], inputTokens: [425, 425, 425] },
+      logic: { scores: [100, 100, 100], tokens: [30, 28, 32], inputTokens: [425, 425, 425] },
+      refactoring: { scores: [100, 100, 100], tokens: [110, 105, 115], inputTokens: [425, 425, 425] },
+      review: { scores: [100, 100, 100], tokens: [120, 115, 125], inputTokens: [425, 425, 425] }
     },
     titan_aggressive: {
-      coding: { scores: [100, 100, 100], tokens: [45, 45, 45] },
-      debugging: { scores: [90, 90, 90], tokens: [50, 50, 50] },
-      logic: { scores: [60, 60, 60], tokens: [20, 20, 20] }
+      coding: { scores: [95, 95, 95], tokens: [50, 48, 52], inputTokens: [400, 400, 400] },
+      debugging: { scores: [80, 80, 80], tokens: [55, 52, 58], inputTokens: [400, 400, 400] },
+      logic: { scores: [60, 60, 60], tokens: [18, 16, 20], inputTokens: [400, 400, 400] },
+      refactoring: { scores: [90, 90, 90], tokens: [60, 58, 62], inputTokens: [400, 400, 400] },
+      review: { scores: [70, 70, 70], tokens: [65, 62, 68], inputTokens: [400, 400, 400] }
     }
   };
 
@@ -294,9 +370,9 @@ function runMockMode() {
 }
 
 function printTable(results, source) {
-  console.log('-'.repeat(133));
-  console.log('| Variant          | Coding Score | Debug Score | Logic Score | Avg Score %   | Avg Tokens    | UID (Density) | Status    | Source |');
-  console.log('-'.repeat(133));
+  console.log('-'.repeat(173));
+  console.log('| Variant          | Coding | Debug  | Logic  | Refact | Review | Avg Score %   | Avg In Tok    | Avg Out Tok   | Avg Tot Tok   | UID (Density) | Status    | Source |');
+  console.log('-'.repeat(173));
 
   const order = ['baseline', 'caveman', 'ponytail', 'titan', 'titan_lite', 'titan_aggressive'];
 
@@ -310,27 +386,48 @@ function printTable(results, source) {
     const debuggingTokens = tasksData.debugging.tokens;
     const logicScores = tasksData.logic.scores;
     const logicTokens = tasksData.logic.tokens;
+    const refactoringScores = tasksData.refactoring.scores;
+    const refactoringTokens = tasksData.refactoring.tokens;
+    const reviewScores = tasksData.review.scores;
+    const reviewTokens = tasksData.review.tokens;
 
     const codingMeanScore = codingScores.reduce((a, b) => a + b, 0) / codingScores.length;
     const debuggingMeanScore = debuggingScores.reduce((a, b) => a + b, 0) / debuggingScores.length;
     const logicMeanScore = logicScores.reduce((a, b) => a + b, 0) / logicScores.length;
+    const refactoringMeanScore = refactoringScores.reduce((a, b) => a + b, 0) / refactoringScores.length;
+    const reviewMeanScore = reviewScores.reduce((a, b) => a + b, 0) / reviewScores.length;
 
-    // Calculate overall stats by averaging the runs
+    const codingInTokens = tasksData.coding.inputTokens || Array(codingScores.length).fill(0);
+    const debuggingInTokens = tasksData.debugging.inputTokens || Array(debuggingScores.length).fill(0);
+    const logicInTokens = tasksData.logic.inputTokens || Array(logicScores.length).fill(0);
+    const refactoringInTokens = tasksData.refactoring.inputTokens || Array(refactoringScores.length).fill(0);
+    const reviewInTokens = tasksData.review.inputTokens || Array(reviewScores.length).fill(0);
+
     const numRuns = codingTokens.length;
     const runScores = [];
-    const runTokens = [];
+    const runInTokens = [];
+    const runOutTokens = [];
+    const runTotalTokens = [];
+
     for (let r = 0; r < numRuns; r++) {
-      runScores.push((codingScores[r] + debuggingScores[r] + logicScores[r]) / 3);
-      runTokens.push((codingTokens[r] + debuggingTokens[r] + logicTokens[r]) / 3);
+      const scoreSum = codingScores[r] + debuggingScores[r] + logicScores[r] + refactoringScores[r] + reviewScores[r];
+      const inSum = codingInTokens[r] + debuggingInTokens[r] + logicInTokens[r] + refactoringInTokens[r] + reviewInTokens[r];
+      const outSum = codingTokens[r] + debuggingTokens[r] + logicTokens[r] + refactoringTokens[r] + reviewTokens[r];
+      runScores.push(scoreSum / 5);
+      runInTokens.push(inSum / 5);
+      runOutTokens.push(outSum / 5);
+      runTotalTokens.push((inSum + outSum) / 5);
     }
+
     const scoreStats = getStats(runScores);
-    const tokenStats = getStats(runTokens);
+    const inTokenStats = getStats(runInTokens);
+    const outTokenStats = getStats(runOutTokens);
+    const totalTokenStats = getStats(runTotalTokens);
 
     const avgScore = scoreStats.mean;
-    const avgTokens = tokenStats.mean;
+    const avgTotalTokens = totalTokenStats.mean;
 
-    // UID = Avg Score % / Avg Tokens * 1000
-    const uid = avgTokens > 0 ? ((avgScore / avgTokens) * 1000).toFixed(1) : '0.0';
+    const uid = avgTotalTokens > 0 ? ((avgScore / avgTotalTokens) * 1000).toFixed(1) : '0.0';
 
     let status = 'Reliable';
     if (avgScore < 80) status = '⚠ Degraded';
@@ -339,17 +436,23 @@ function printTable(results, source) {
     const codingScoreStr = Math.round(codingMeanScore) + '%';
     const debuggingScoreStr = Math.round(debuggingMeanScore) + '%';
     const logicScoreStr = Math.round(logicMeanScore) + '%';
+    const refactoringScoreStr = Math.round(refactoringMeanScore) + '%';
+    const reviewScoreStr = Math.round(reviewMeanScore) + '%';
 
     const avgScoreStr = `${Math.round(scoreStats.mean)}% ±${Math.round(scoreStats.std)}`;
-    const avgTokensStr = `${Math.round(tokenStats.mean)} ±${Math.round(tokenStats.std)}`;
+    const avgInTokensStr = `${Math.round(inTokenStats.mean)} ±${Math.round(inTokenStats.std)}`;
+    const avgOutTokensStr = `${Math.round(outTokenStats.mean)} ±${Math.round(outTokenStats.std)}`;
+    const avgTotalTokensStr = `${Math.round(totalTokenStats.mean)} ±${Math.round(totalTokenStats.std)}`;
 
-    console.log(`| ${variantName.padEnd(16)} | ${codingScoreStr.padStart(12)} | ${debuggingScoreStr.padStart(11)} | ${logicScoreStr.padStart(11)} | ${avgScoreStr.padStart(13)} | ${avgTokensStr.padStart(13)} | ${uid.padStart(13)} | ${status.padEnd(9)} | ${source.padEnd(6)} |`);
+    console.log(`| ${variantName.padEnd(16)} | ${codingScoreStr.padStart(6)} | ${debuggingScoreStr.padStart(6)} | ${logicScoreStr.padStart(6)} | ${refactoringScoreStr.padStart(6)} | ${reviewScoreStr.padStart(6)} | ${avgScoreStr.padStart(13)} | ${avgInTokensStr.padStart(13)} | ${avgOutTokensStr.padStart(13)} | ${avgTotalTokensStr.padStart(13)} | ${uid.padStart(13)} | ${status.padEnd(9)} | ${source.padEnd(6)} |`);
   }
-  console.log('-'.repeat(133));
+  console.log('-'.repeat(173));
   console.log('\nDefinitions:');
   console.log('- **Avg Score %**: Rubric-based accuracy distribution across all task categories (mean ± standard deviation).');
-  console.log('- **Avg Tokens**: Mean output token count per task (mean ± standard deviation).');
-  console.log('- **UID (Usable Intelligence Density)**: (Avg Score % / Avg Tokens) * 1000. Ratio of task intelligence preserved per token.');
+  console.log('- **Avg In Tok**: Mean input (system + user prompt) token count per task (mean ± standard deviation).');
+  console.log('- **Avg Out Tok**: Mean output token count per task (mean ± standard deviation).');
+  console.log('- **Avg Tot Tok**: Mean total (input + output) token count per task (mean ± standard deviation).');
+  console.log('- **UID (Usable Intelligence Density)**: (Avg Score % / Avg Total Tokens) * 1000. Ratio of task intelligence preserved per context token.');
   console.log('- **Status**: Safety indicators based on reasoning retention curve.');
   console.log('- **Source**: Source of the data (\'mock\' for simulation, \'api\' for real API calls).');
 }
@@ -383,7 +486,7 @@ async function runBenchmark() {
 
     for (const task of TASKS) {
       console.log(`  Running ${task.name}...`);
-      results[name][task.id] = { scores: [], tokens: [] };
+      results[name][task.id] = { scores: [], tokens: [], inputTokens: [] };
 
       for (let run = 0; run < RUNS_PER_TASK; run++) {
         if (run > 0) {
@@ -400,11 +503,13 @@ async function runBenchmark() {
           const score = task.evaluate(res.text);
           results[name][task.id].scores.push(score);
           results[name][task.id].tokens.push(res.outputTokens);
-          console.log(`      Tokens: ${res.outputTokens} | Rubric Score: ${score}%`);
+          results[name][task.id].inputTokens.push(res.inputTokens);
+          console.log(`      Tokens: ${res.outputTokens} (in: ${res.inputTokens}) | Rubric Score: ${score}%`);
         } catch (err) {
           console.error(`      Error: ${err.message}`);
           results[name][task.id].scores.push(0);
           results[name][task.id].tokens.push(0);
+          results[name][task.id].inputTokens.push(0);
         }
       }
     }
@@ -418,12 +523,11 @@ async function runBenchmark() {
   console.log('Run info:');
   console.log(`  Provider : ${provider} (${model})`);
   console.log(`  Runs/task: ${RUNS_PER_TASK}`);
-  console.log('  Tasks    : coding, debugging, logic');
+  console.log('  Tasks    : coding, debugging, logic, refactoring, review');
   console.log(`  Timestamp: ${timestamp}`);
   console.log('  Source   : REAL API (empirical)');
   console.log('─────────────────────────────────────────\n');
 
-  // Save automatically to root
   const resultsData = {
     timestamp,
     provider,

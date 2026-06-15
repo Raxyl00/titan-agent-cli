@@ -11,6 +11,10 @@
  * Returns { frontmatter: object, body: string }.
  */
 function parseFrontmatter(content) {
+  if (!content.startsWith('---')) {
+    return { frontmatter: {}, body: content };
+  }
+
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return { frontmatter: {}, body: content };
 
@@ -18,69 +22,163 @@ function parseFrontmatter(content) {
   const body = match[2];
   const frontmatter = {};
 
-  let currentKey = null;
-  let currentValue = '';
-  let inMultiline = false;
-  let inArray = false;
-  let arrayItems = [];
+  const SUPPORTED_KEYS = new Set([
+    'name', 'version', 'description', 'license', 'source', 'compatibility', 'globs', 'alwaysApply'
+  ]);
 
-  for (const line of raw.split('\n')) {
+  const lines = raw.split(/\r?\n/);
+  let currentKey = null;
+  let inBlockScalar = false;
+  let blockScalarType = ''; // '|' or '>'
+  let blockScalarLines = [];
+  let blockScalarIndent = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmed = line.trim();
 
-    // Array item
-    if (inArray && trimmed.startsWith('- ')) {
-      arrayItems.push(trimmed.slice(2).trim());
-      continue;
-    }
-
-    // End of array — save and process current line
-    if (inArray && !trimmed.startsWith('- ')) {
-      frontmatter[currentKey] = arrayItems;
-      inArray = false;
-      arrayItems = [];
-      currentKey = null;
-    }
-
-    // End of multiline — save and process current line
-    if (inMultiline && /^\S/.test(line)) {
-      frontmatter[currentKey] = currentValue.trim();
-      inMultiline = false;
-      currentKey = null;
-      currentValue = '';
-    }
-
-    // Multiline continuation
-    if (inMultiline) {
-      currentValue += ' ' + trimmed;
-      continue;
-    }
-
-    // Key-value pair
-    const kvMatch = trimmed.match(/^(\w[\w-]*):\s*(.*)$/);
-    if (kvMatch) {
-      currentKey = kvMatch[1];
-      const val = kvMatch[2];
-
-      if (val === '>' || val === '|') {
-        inMultiline = true;
-        currentValue = '';
-      } else if (val === '') {
-        // Could be array start
-        inArray = true;
-        arrayItems = [];
-      } else {
-        // Remove surrounding quotes
-        frontmatter[currentKey] = val.replace(/^["']|["']$/g, '');
+    if (inBlockScalar) {
+      const matchIndent = line.match(/^(\s+)\S/);
+      if (matchIndent) {
+        const indent = matchIndent[1].length;
+        if (blockScalarIndent === 0) {
+          blockScalarIndent = indent;
+        }
+        if (indent >= blockScalarIndent) {
+          blockScalarLines.push(line.slice(blockScalarIndent));
+          continue;
+        }
+      } else if (trimmed === '') {
+        blockScalarLines.push('');
+        continue;
       }
+
+      // Block scalar ended
+      let value = '';
+      if (blockScalarType === '|') {
+        value = blockScalarLines.join('\n') + '\n';
+      } else if (blockScalarType === '>') {
+        let folded = [];
+        let currentParagraph = [];
+        for (const bl of blockScalarLines) {
+          if (bl.trim() === '') {
+            if (currentParagraph.length > 0) {
+              folded.push(currentParagraph.join(' '));
+              currentParagraph = [];
+            }
+            folded.push('');
+          } else {
+            currentParagraph.push(bl.trim());
+          }
+        }
+        if (currentParagraph.length > 0) {
+          folded.push(currentParagraph.join(' '));
+        }
+        value = folded.join('\n') + '\n';
+      }
+      frontmatter[currentKey] = value.trim();
+
+      inBlockScalar = false;
+      blockScalarLines = [];
+      blockScalarIndent = 0;
+      currentKey = null;
+    }
+
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const kvMatch = line.match(/^(\s*)(\w[\w-]*):\s*(.*)$/);
+    if (kvMatch) {
+      const key = kvMatch[2];
+      let val = kvMatch[3].trim();
+
+      if (!SUPPORTED_KEYS.has(key)) {
+        console.warn(`Warning: Unsupported frontmatter key "${key}"`);
+      }
+
+      currentKey = key;
+
+      if (val === '|' || val === '>') {
+        inBlockScalar = true;
+        blockScalarType = val;
+        blockScalarLines = [];
+        blockScalarIndent = 0;
+      } else if (val === '') {
+        // Might be followed by list items
+      } else {
+        if (val.startsWith('[') && val.endsWith(']')) {
+          const inner = val.slice(1, -1).trim();
+          if (inner === '') {
+            val = [];
+          } else {
+            val = inner.split(',').map(item => {
+              const cleaned = item.trim();
+              if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+                return cleaned.slice(1, -1);
+              }
+              if (cleaned === 'true') return true;
+              if (cleaned === 'false') return false;
+              if (!isNaN(cleaned) && cleaned !== '') return Number(cleaned);
+              return cleaned;
+            });
+          }
+        } else {
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          } else {
+            if (val === 'true') val = true;
+            else if (val === 'false') val = false;
+            else if (!isNaN(val) && val !== '') val = Number(val);
+          }
+        }
+        frontmatter[key] = val;
+      }
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)-\s*(.*)$/);
+    if (listMatch && currentKey) {
+      let val = listMatch[2].trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      } else {
+        if (val === 'true') val = true;
+        else if (val === 'false') val = false;
+        else if (!isNaN(val) && val !== '') val = Number(val);
+      }
+
+      if (!Array.isArray(frontmatter[currentKey])) {
+        frontmatter[currentKey] = [];
+      }
+      frontmatter[currentKey].push(val);
     }
   }
 
-  // Flush remaining
-  if (inMultiline && currentKey) {
-    frontmatter[currentKey] = currentValue.trim();
-  }
-  if (inArray && currentKey) {
-    frontmatter[currentKey] = arrayItems;
+  if (inBlockScalar && currentKey) {
+    let value = '';
+    if (blockScalarType === '|') {
+      value = blockScalarLines.join('\n') + '\n';
+    } else if (blockScalarType === '>') {
+      let folded = [];
+      let currentParagraph = [];
+      for (const bl of blockScalarLines) {
+        if (bl.trim() === '') {
+          if (currentParagraph.length > 0) {
+            folded.push(currentParagraph.join(' '));
+            currentParagraph = [];
+          }
+          folded.push('');
+        } else {
+          currentParagraph.push(bl.trim());
+        }
+      }
+      if (currentParagraph.length > 0) {
+        folded.push(currentParagraph.join(' '));
+      }
+      value = folded.join('\n') + '\n';
+    }
+    frontmatter[currentKey] = value.trim();
   }
 
   return { frontmatter, body };

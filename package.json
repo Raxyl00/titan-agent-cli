@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "filter:test": "node src/filter.js --test"
+    "filter:test": "node src/filter.js --test",
+    "count-tokens": "node scripts/count-tokens.js"
   },
   "keywords": [
     "llm",
