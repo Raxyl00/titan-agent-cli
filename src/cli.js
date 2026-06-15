@@ -11,15 +11,17 @@ function printHelp() {
     `  TITAN v${VERSION} — Token Intelligence Through Agent Narrowing`,
     '',
     '  Usage:',
-    '    titan init --agent=<name> [--lite]  Generate skill file (lite uses ~400 tokens)',
-    '    titan init --all [--lite]           Generate skill files for all agents',
-    '    titan init --list                   List available agents',
-    '    titan compress <file>               Compress a memory/context file (L3)',
-    '    titan debt [--dir=<path>]           Scan for ponytail: comments',
-    '    titan filter                        Stdin/stdout terminal output filter',
-    '    titan filter --test                 Run filter self-test',
-    '    titan help                          Show this help',
-    '    titan version                       Show version',
+    '    titan init --agent=<name> [--lite|--balanced|--aggressive]  Generate skill file',
+    '    titan init --all [--lite|--balanced|--aggressive]           Generate skill files for all agents',
+    '    titan init --list                                           List available agents',
+    '    titan compress <file>                                       Compress a memory/context file (L3)',
+    '    titan debt [--dir=<path>]                                   Scan for ponytail: comments',
+    '    titan filter                                                Stdin/stdout terminal output filter',
+    '    titan filter --test                                         Run filter self-test',
+    '    titan benchmark                                             Run L1/L2/L3 token savings benchmark',
+    '    titan report [--reset]                                      Display ANSI savings dashboard',
+    '    titan help                                                  Show this help',
+    '    titan version                                               Show version',
     '',
     '  Agents:',
   ];
@@ -39,7 +41,12 @@ function printVersion() {
 function cmdInit(args) {
   const targetDir = getFlag(args, '--dir') || process.cwd();
   const isLite = args.includes('--lite');
-  const initOptions = { lite: isLite };
+  const isAggressive = args.includes('--aggressive');
+  const initOptions = { lite: isLite, aggressive: isAggressive };
+
+  let modeName = 'BALANCED';
+  if (isLite) modeName = 'LITE';
+  if (isAggressive) modeName = 'AGGRESSIVE';
 
   // List agents
   if (args.includes('--list')) {
@@ -53,7 +60,7 @@ function cmdInit(args) {
 
   // All agents
   if (args.includes('--all')) {
-    console.log(`\nGenerating TITAN ${isLite ? 'LITE ' : ''}skills for all agents in: ${targetDir}\n`);
+    console.log(`\nGenerating TITAN ${modeName} skills for all agents in: ${targetDir}\n`);
     const results = initAll(targetDir, initOptions);
 
     for (const r of results) {
@@ -86,7 +93,7 @@ function cmdInit(args) {
 
   try {
     const result = initAgent(agentId, targetDir, initOptions);
-    console.log(`\n  ✓ ${agentId} → ${result.path} ${isLite ? '(LITE)' : ''}\n`);
+    console.log(`\n  ✓ ${agentId} → ${result.path} (${modeName})\n`);
     if (result.warning) console.log(`  ⚠ ${result.warning}\n`);
   } catch (err) {
     console.error(`Error: ${err.message}`);
@@ -153,6 +160,75 @@ function cmdFilter(args) {
   }
 }
 
+async function cmdBenchmark(args) {
+  const { runBenchmark } = require('./benchmark');
+  try {
+    await runBenchmark();
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function cmdReport(args) {
+  const os = require('os');
+  const fs = require('fs');
+  const path = require('path');
+
+  const homeDir = os.homedir();
+  const statsFile = path.join(homeDir, '.titan', 'stats.json');
+
+  if (args.includes('--reset')) {
+    const defaultStats = {
+      totalLinesFiltered: 0,
+      totalCharsSaved: 0,
+      totalTokensSaved: 0,
+      runsCount: 0
+    };
+    try {
+      fs.writeFileSync(statsFile, JSON.stringify(defaultStats, null, 2), 'utf8');
+      console.log('\n  ✓ Savings statistics have been reset.\n');
+    } catch (e) {
+      console.error(`Error resetting stats: ${e.message}`);
+    }
+    return;
+  }
+
+  let stats = {
+    totalLinesFiltered: 0,
+    totalCharsSaved: 0,
+    totalTokensSaved: 0,
+    runsCount: 0
+  };
+
+  if (fs.existsSync(statsFile)) {
+    try {
+      stats = JSON.parse(fs.readFileSync(statsFile, 'utf8'));
+    } catch (e) {
+      // standard fallback
+    }
+  }
+
+  const costSaved = (stats.totalTokensSaved || 0) * 0.000003;
+
+  console.log('\n  ┌────────────────────────────────────────────────────────┐');
+  console.log('  │   TITAN Context Savings Dashboard                      │');
+  console.log('  └────────────────────────────────────────────────────────┘');
+  console.log(`    Active Runs Tracked:   ${(stats.runsCount || 0).toString().padStart(6)}`);
+  console.log(`    Total Lines Filtered:  ${(stats.totalLinesFiltered || 0).toString().padStart(6)}`);
+  console.log(`    Characters Compressed: ${(stats.totalCharsSaved || 0).toString().padStart(6)}`);
+  console.log(`    Estimated Tokens Saved: ${(stats.totalTokensSaved || 0).toString().padStart(6)}`);
+  console.log(`    Financial Savings:     $${costSaved.toFixed(4)}`);
+  console.log('  ┌────────────────────────────────────────────────────────┐');
+
+  const tokens = stats.totalTokensSaved || 0;
+  let level = 0;
+  if (tokens > 0) level = Math.min(25, Math.ceil(tokens / 500));
+  const bar = '█'.repeat(level) + '░'.repeat(25 - level);
+  console.log(`    Performance Tier:     [${bar}] ${tokens} saved`);
+  console.log('  └────────────────────────────────────────────────────────┘\n');
+}
+
 /**
  * Extract --flag=value from args array.
  */
@@ -185,6 +261,12 @@ function main(argv) {
       break;
     case 'filter':
       cmdFilter(subArgs);
+      break;
+    case 'benchmark':
+      cmdBenchmark(subArgs);
+      break;
+    case 'report':
+      cmdReport(subArgs);
       break;
     case 'help':
     case '--help':

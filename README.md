@@ -96,6 +96,12 @@ titan init --agent=copilot
 
 # Generate a lightweight version (~375 tokens, perfect for short chats)
 titan init --agent=cursor --lite
+
+# Generate the default balanced version (~1400 tokens, standard features)
+titan init --agent=cursor --balanced
+
+# Generate an aggressive telegraphese version (~500 tokens, maximum compression)
+titan init --agent=cursor --aggressive
 ```
 
 ---
@@ -137,10 +143,10 @@ TITAN CLI is written in pure Node.js standard library with **zero external depen
 
 ```bash
 # Initialize TITAN rules for an agent
-titan init --agent=<name> [--lite]
+titan init --agent=<name> [--lite|--balanced|--aggressive]
 
 # Generate rule files for ALL compatible agents in the directory
-titan init --all [--lite]
+titan init --all [--lite|--balanced|--aggressive]
 
 # Compress a static Markdown file (L3 contextual compression)
 titan compress CLAUDE.md
@@ -148,8 +154,17 @@ titan compress CLAUDE.md
 # Scan the codebase for ponytail: comments to audit tech debt
 titan debt [--dir=<path>]
 
-# Stream filter to strip terminal/build noise
+# Stream filter to strip terminal/build noise (saving statistics are logged automatically)
 npm run build 2>&1 | titan filter
+
+# Show beautiful context token savings dashboard and cost report
+titan report
+
+# Reset accumulated savings report
+titan report --reset
+
+# Run local or API-based token savings benchmark
+titan benchmark
 ```
 
 ---

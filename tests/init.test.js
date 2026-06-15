@@ -145,6 +145,24 @@ describe('TITAN Init', () => {
     });
   });
 
+  describe('aggressive mode generation', () => {
+    it('should generate significantly smaller files when aggressive: true is passed', () => {
+      const dirNormal = path.join(TEST_DIR, 'aggr-test-normal');
+      const dirAggr = path.join(TEST_DIR, 'aggr-test-aggr');
+      fs.mkdirSync(dirNormal, { recursive: true });
+      fs.mkdirSync(dirAggr, { recursive: true });
+
+      const normalRes = initAgent('cursor', dirNormal);
+      const aggrRes = initAgent('cursor', dirAggr, { aggressive: true });
+
+      const normalContent = fs.readFileSync(path.join(dirNormal, normalRes.path), 'utf8');
+      const aggrContent = fs.readFileSync(path.join(dirAggr, aggrRes.path), 'utf8');
+
+      assert.ok(aggrContent.length < normalContent.length * 0.5, 'Aggressive content should be less than half the size of normal content');
+      assert.ok(aggrContent.includes('TITAN AGGRESSIVE'), 'Should contain TITAN AGGRESSIVE reference');
+    });
+  });
+
   describe('initAll', () => {
     it('should generate files for all agents', () => {
       const dir = path.join(TEST_DIR, 'all-agents');

@@ -2,6 +2,9 @@
 'use strict';
 
 const readline = require('readline');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
 // --- Noise Patterns ---
 // Build system chatter, success messages, and uninformative output
@@ -60,6 +63,46 @@ function filterStackLine(line) {
 
 function isStackFrame(line) {
   return /^\s+at\s/.test(line);
+}
+
+function logSavings(inputChars, outputChars, linesFiltered) {
+  const charsSaved = Math.max(0, inputChars - outputChars);
+  if (charsSaved === 0 && linesFiltered === 0) return;
+  const tokensSaved = Math.round(charsSaved / 4);
+
+  const homeDir = os.homedir();
+  const titanDir = path.join(homeDir, '.titan');
+  const statsFile = path.join(titanDir, 'stats.json');
+
+  try {
+    if (!fs.existsSync(titanDir)) {
+      fs.mkdirSync(titanDir, { recursive: true });
+    }
+
+    let stats = {
+      totalLinesFiltered: 0,
+      totalCharsSaved: 0,
+      totalTokensSaved: 0,
+      runsCount: 0
+    };
+
+    if (fs.existsSync(statsFile)) {
+      try {
+        stats = JSON.parse(fs.readFileSync(statsFile, 'utf8'));
+      } catch (e) {
+        // use default stats if corrupt
+      }
+    }
+
+    stats.totalLinesFiltered = (stats.totalLinesFiltered || 0) + linesFiltered;
+    stats.totalCharsSaved = (stats.totalCharsSaved || 0) + charsSaved;
+    stats.totalTokensSaved = (stats.totalTokensSaved || 0) + tokensSaved;
+    stats.runsCount = (stats.runsCount || 0) + 1;
+
+    fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2), 'utf8');
+  } catch (err) {
+    // silently catch to prevent stream crashes
+  }
 }
 
 /**
@@ -124,21 +167,33 @@ function streamMode() {
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   const buffer = [];
   let flushing = false;
+  let totalInputChars = 0;
+  let totalOutputChars = 0;
+  let totalInputLinesCount = 0;
 
   function flush() {
     if (flushing) return;
     flushing = true;
-    const result = processLines(buffer.splice(0));
-    for (const line of result) process.stdout.write(line + '\n');
+    const batch = buffer.splice(0);
+    const result = processLines(batch);
+    for (const line of result) {
+      process.stdout.write(line + '\n');
+      totalOutputChars += line.length + 1;
+    }
     flushing = false;
   }
 
   rl.on('line', line => {
+    totalInputLinesCount++;
+    totalInputChars += line.length + 1;
     buffer.push(line);
     if (buffer.length >= 100) flush();
   });
 
-  rl.on('close', () => flush());
+  rl.on('close', () => {
+    flush();
+    logSavings(totalInputChars, totalOutputChars, totalInputLinesCount);
+  });
 }
 
 /**

@@ -25,7 +25,12 @@ function loadAdapter(agentId) {
  * Read the master SKILL.md content.
  */
 function readMaster(options = {}) {
-  const filename = options.lite ? 'master-lite.md' : 'master.md';
+  let filename = 'master.md';
+  if (options.lite) {
+    filename = 'master-lite.md';
+  } else if (options.aggressive) {
+    filename = 'master-aggressive.md';
+  }
   const masterPath = path.join(__dirname, '..', 'skills', filename);
   if (!fs.existsSync(masterPath)) {
     throw new Error(`Master skill file not found: ${masterPath}`);
