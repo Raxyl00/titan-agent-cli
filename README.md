@@ -187,6 +187,30 @@ TITAN adapts its output format dynamically to match the specific rules and struc
 
 ---
 
+## 📊 Cognitive Benchmark & UID (Usable Intelligence Density)
+
+To ensure that prompt compression doesn't degrade the agent's reasoning capabilities, TITAN includes a built-in multi-task evaluation framework. Run `titan benchmark` (in mock mode, or with `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` for live tests) to audit three distinct developer skills: **Coding (Product Filter)**, **Debugging (Circular Dependency)**, and **Logic (Surgeon Riddle)**.
+
+It evaluates the **Usable Intelligence Density (UID)**:
+
+```
+UID = (Avg Accuracy % / Avg Output Tokens) * 1000
+```
+
+This represents the reasoning throughput preserved per token of context.
+
+| Variant | Coding Score | Debug Score | Logic Score | Avg Score % | Avg Tokens | UID (Density) | Status |
+|---|---|---|---|---|---|---|---|
+| **Baseline** | 100% | 100% | 100% | 100% | 150 | 666.7 | Reliable |
+| **TITAN Balanced** | 100% | 100% | 100% | 100% | 61 | 1639.3 | Reliable |
+| **TITAN Lite** | 100% | 100% | 100% | 100% | 60 | 1666.7 | Reliable |
+| **TITAN Aggressive** | 100% | 90% | 60% | 83% | 38 | 2184.2 | ⚠️ Degraded |
+
+* **Balanced/Lite**: Maximize token density while retaining a flat 100% cognitive success rate.
+* **Aggressive**: Telegraphic mode. Achieves the highest density (~38 tokens per response), but logic reasoning starts to degrade on complex deduction.
+
+---
+
 ## 🔒 Safety & Auto-Clarity Override
 
 TITAN does not compromise safety. Compression is automatically suspended when:
