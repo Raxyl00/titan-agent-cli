@@ -13,10 +13,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/matteofiorini/titan-agent/stargazers"><img src="https://img.shields.io/github/stars/matteofiorini/titan-agent?style=flat&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/Raxyl00/titan-agent-cli/stargazers"><img src="https://img.shields.io/github/stars/Raxyl00/titan-agent-cli?style=flat&color=yellow" alt="Stars"></a>
   <a href="https://www.npmjs.com/package/titan-agent-cli"><img src="https://img.shields.io/npm/v/titan-agent-cli?style=flat&color=blue" alt="NPM Version"></a>
   <a href="https://www.npmjs.com/package/titan-agent-cli"><img src="https://img.shields.io/npm/dm/titan-agent-cli?style=flat&color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/matteofiorini/titan-agent?style=flat" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Raxyl00/titan-agent-cli?style=flat" alt="License"></a>
 </p>
 
 <p align="center">
