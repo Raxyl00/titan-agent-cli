@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <em>Unified token compression framework for AI coding agents. Cut token usage by 70-85% across L1, L2, and L3 layers.</em>
+  <em>Caveman + Ponytail combined. Cut 70% of session tokens across linguistic, structural, and contextual layers. 9 agents. 1 CLI.</em>
 </p>
 
 <p align="center">
@@ -17,29 +17,24 @@
   <a href="https://www.npmjs.com/package/titan-agent-cli"><img src="https://img.shields.io/npm/v/titan-agent-cli?style=flat&color=blue" alt="NPM Version"></a>
   <a href="https://www.npmjs.com/package/titan-agent-cli"><img src="https://img.shields.io/npm/dm/titan-agent-cli?style=flat&color=green" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://badgen.net/github/license/Raxyl00/titan-agent-cli?color=blue" alt="License"></a>
-</p>
-
-<p align="center">
-  <a href="#-before--after">Before / After</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-the-three-layers">The Three Layers</a> •
-  <a href="#-cli-reference">CLI Reference</a> •
-  <a href="#-supported-agents">Supported Agents</a> •
-  <a href="#-credits">Credits</a>
+  <img src="https://img.shields.io/badge/built-during%20exams-orange" alt="Built during high school exams">
 </p>
 
 ---
 
-**TITAN** integrates, optimizes, and extends the two most powerful prompt-compression philosophies into a single, unified, zero-dependency utility. It ports **L1 Linguistic Compression** (from Caveman) and **L2 Structural Code Compression** (from Ponytail) natively to **9+ major AI coding agents**, adding a contextual **L3 layer** (filtering, compression of static memory, and terminal output processing).
+## ⚡ TL;DR
 
+Your AI agent burns $0.40 per response explaining bugs in 4 paragraphs.  
+**TITAN** compresses it to 2 sentences. Same fix. 75% fewer tokens.
+
+Combines [Caveman](https://github.com/juliusbrussee/caveman) + [Ponytail](https://github.com/DietrichGebert/ponytail) into one CLI.  
+Supports 9 AI coding agents. Zero dependencies.
+
+```bash
+npm install -g titan-agent-cli
 ```
-┌──────────────────────────────────────────┐
-│  TOKENS SAVED               ████████ 82% │
-│  REASONING & SYNTAX         ████████ 100%│
-│  RESPONSE SPEED             ████████ ~3x │
-│  UNIVERSAL COMPATIBILITY    ████████ 9 IDE│
-└──────────────────────────────────────────┘
-```
+
+*Built in 10 days during high school exams. MIT license.*
 
 ---
 
@@ -51,13 +46,13 @@
 
 ### 🗣️ Standard Agent Output (301 tokens)
 
-> "Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by a race condition in the authentication middleware. I've actually just noticed that the problem is probably related to the fact that you're basically creating a new database connection on every request, rather than utilizing a connection pool. This is really a very common issue that developers encounter. 
+> "Sure! I'd be absolutely happy to help you with that. The issue you're experiencing is actually, basically, fundamentally caused by a race condition in the authentication middleware. I've actually just noticed that the problem is probably related to the fact that you're basically creating a new database connection on every single request, rather than utilizing a connection pool. This is really a very common issue that developers encounter, and I would recommend at this point in time to implement this.
 > 
-> Here's what I'd recommend:
+> Here's what I would recommend at this point in time:
 > ```javascript
 > const pool = new Pool({ max: 20 });
 > ```
-> To implement this, you should probably take into account that you'll likely want to make sure that the pool size is appropriate for your workload."
+> To implement this, you should probably take into account that you'll likely want to make sure that the pool size is appropriate for your workload, at this point in time."
 
 </td>
 <td width="50%">
@@ -65,29 +60,35 @@
 ### 🛡️ TITAN Lite Output (75 tokens)
 
 > ```javascript
-> const pool = new Pool({ max: 20 });
-> // ponytail: connection pooling, default size
+> const pool = new Pool({ max: 20 }); // ponytail: default pool
 > ```
-> Race condition in auth middleware. Created new database connection on each request.
-> 
-> skipped: dynamic pool scaling. Add if workload fluctuates.
+> Auth middleware race condition. Pool used.
 
 </td>
 </tr>
 </table>
 
-**Same functionality. 75% fewer tokens. Zero overhead.**
+**Same fix. 75% fewer tokens. Zero overhead.**
+
+---
+
+## 🧠 Why TITAN?
+
+* **Caveman shrinks the mouth** (L1: drops "actually", "basically", "likely").
+* **Ponytail shrinks the code** (L2: YAGNI ladder, skips 500-line abstractions).
+* **TITAN shrinks the session** (L3: compresses CLAUDE.md, filters build logs, shrinks subagent outputs before they hit context).
 
 ---
 
 ## ⚡ Quick Start
 
-Install TITAN globally and initialize the rules for your favorite editor in 10 seconds.
+```bash
+npm install -g titan-agent-cli
+```
+
+Initialize the rules for your favorite editor in 10 seconds:
 
 ```bash
-# Install the CLI tool
-npm install -g titan-agent-cli
-
 # Generate TITAN rules for Cursor (.cursor/rules/titan.mdc)
 titan init --agent=cursor
 
@@ -146,6 +147,9 @@ TITAN CLI is written in pure Node.js standard library with **zero external depen
 # Initialize TITAN rules for an agent
 titan init --agent=<name> [--lite|--balanced|--aggressive]
 
+# Run the test suite
+titan test
+
 # Generate rule files for ALL compatible agents in the directory
 titan init --all [--lite|--balanced|--aggressive]
 
@@ -166,9 +170,6 @@ titan report --reset
 
 # Run local or API-based token savings benchmark
 titan benchmark
-
-# Run the test suite
-titan test
 ```
 
 ---
@@ -227,7 +228,7 @@ This represents the reasoning throughput preserved per token of context.
 | **Ponytail** | 100% | 70% | 80% | 100% | 80% | 86% ±12% | 115 ±0 | 67 ±6 | 182 ±6 | 472.5 | Reliable |
 | **TITAN Balanced** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 1500 ±0 | 80 ±5 | 1580 ±5 | 63.3 | Reliable |
 | **TITAN Lite** | 100% | 100% | 100% | 100% | 100% | 100% ±0% | 425 ±0 | 91 ±7 | 516 ±7 | 193.8 | Reliable |
-| **TITAN Aggressive** | 95% | 80% | 60% | 90% | 70% | 79% ±12% | 400 ±0 | 50 ±3 | 450 ±3 | 175.6 | ⚠ Degraded |
+| **TITAN Aggressive** | 95% | 80% | 60% | 90% | 70% | 79% ±12% | 400 ±0 | 50 ±3 | 450 ±3 | 175.7 | ⚠ Degraded |
 
 * **Balanced/Lite**: Maximize token density while retaining a flat 100% cognitive success rate.
 * **Aggressive**: Telegraphic mode. Achieves high density (~50 tokens output per response), but logic reasoning starts to degrade on complex tasks.
